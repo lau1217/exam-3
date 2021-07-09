@@ -3,9 +3,9 @@ title: "morales-exam3"
 author: "Laura Morales"
 date: "7/8/2021"
 output:
-  pdf_document: default
-  html_document: default
   word_document: default
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
