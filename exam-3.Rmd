@@ -1,0 +1,207 @@
+---
+title: "morales-exam3"
+author: "Laura Morales"
+date: "7/8/2021"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Question 1: Clear environment
+
+```{r}
+#clear environment 
+rm(list = ls(all=TRUE))
+```
+## Question 2: load WDI package and female labor force participation 
+
+```{r}
+#load all necessary libraries 
+library(rio)
+library(tidyverse)
+library(googlesheets4)
+library(labelled)
+library(data.table)
+library(varhandle)
+library(ggrepel)
+library(geosphere)
+library(rgeos)
+library(viridis)
+library(mapview)
+library(rnaturalearth)
+library(rnaturalearthdata)
+library(devtools)
+devtools::install_github("ropensci/rnaturalearthhires")
+library(rnaturalearthhires)
+library(raster)
+library(sp)
+library(sf)
+devtools::install_github("yutannihilation/ggsflabel")
+library(ggsflabel)
+library(Imap)
+library(ggplot2)
+library(dplyr)
+library(WDI)
+library(countrycode)
+#load the WDi data
+female_lfp = WDI(country = "all", indicator = c("SL.TLF.CACT.FE.ZS"), start = 2010, end = 2015, cache = NULL)
+```
+## Question 3: rename variable
+
+```{r}
+#rename the variable
+female_lfp <- rename(female_lfp, "flfp"="SL.TLF.CACT.FE.ZS")
+```
+
+## Question 4: collapse female_lfpby the mean value forflfp 
+
+```{r}
+#collapse female_lfpby the mean value forflfp 
+collapsed_flfp= female_lfp %>% group_by(country, iso2c) %>% summarise(flfp = mean(flfp), na.rm=TRUE) 
+```
+## Question 5: countries which have an average female force participation rates less than 15%
+
+```{r}
+#filter those over 15%
+less_15 <- filter(collapsed_flfp, flfp < 15 )
+```
+## Question 6: Map of the world of usingcollapsed_flfp, using the viridis colorschem
+
+```{r}
+#load world borders
+world_borders <- st_read("/Users/lauram./Documents/Gov 355M Data Sci for Soc/Mods/Mod 11/world border shape files/World_Borders.shp")
+#transform to WGS84 projection
+borders = st_transform(world_borders, "+proj=latlong +ellps=WGS84 +datum=WGS84")
+rm(world_borders)
+#merege the codes and coordinates
+collapsed_flfp$ISO3= countrycode(sourcevar = collapsed_flfp$country, origin = "country.name", destination="iso3c", warn=TRUE)
+collapsed_flfp_small = na.omit(collapsed_flfp, select("country", "flfp", "ISO3"))
+merged_data= left_join(borders, collapsed_flfp_small, by="ISO3")
+#create the map
+flfp_map= ggplot()+
+  geom_sf(data=borders)+
+  geom_sf(data=merged_data, aes(fill=flfp))+
+  scale_fill_viridis(option="viridis")+
+  ggtitle("World Wide Female Labor Forced Participation (percent), 2010-2015")+
+  theme(plot.title= element_text(hjust = 0.5))+
+  theme_void()
+print(flfp_map)
+```
+## Question 7: Based on the map, which area of the world has, perhaps surprisingly, a cluster of yellow-colored average female labor force participation rate states, indicating the highest onthe scale? 
+
+I thought it was surprising that south easter africa has a very high female labor participation.
+
+## Question 8: Use R to show the same cluster of states referenced in the previous question.
+
+```{r}
+#subset data to only referenced countries
+sa_fl <- subset(merged_data, country=="Madagascar"| country=="Mozambique"| country=="Tanzania")
+sa_fl_map <- subset(borders, NAME=="Madagascar"| NAME=="Mozambique"| NAME=="Tanzania")
+#plot the data
+flfp_map= ggplot()+
+  geom_sf(data=sa_fl_map )+
+  geom_sf(data=sa_fl, aes(fill=flfp))+
+  scale_fill_viridis(option="viridis")+
+  ggtitle("World Wide Female Labor Forced Participation (percent), 2010-2015")+
+  theme(plot.title= element_text(hjust = 0.3))+
+  theme_void()
+print(flfp_map)
+```
+## Question 9: In a Shiny app, what are the three main components and their subcomponents?
+The app has a user interface object, a server function, and a call to the shinyApp function.
+
+## Question 10: Pull this.pdffile from Mike Denly’s webpage. It is a report that Mike Denly and MikeFindley prepared for the US Agency for International Development (USAID). 
+```{r}
+#load libraries
+library(pdftools)
+library(tidyr)
+library(tidytext)
+library(dplyr)
+library(stringr)
+#retrive pdf
+armeniatext= pdf_text(pdf="https://pdf.usaid.gov/pdf_docs/PA00TNMJ.pdf")
+```
+## Question 11: Convert the text pulled from this.pdffile to a data frame,  using the, stringsAsFactors=FALSE option. Call the data frame armeniatext
+
+```{r}
+#convert text to data frame
+armeniatext = as.data.frame(armeniatext, stringsAsFactors=FALSE)
+armeniatext$page=c(1:59)
+colnames(armeniatext)[which(names(armeniatext)=="armeniatext")] <- "text"
+```
+## Question 12: Tokenize the data by word and then remove stop words.
+
+```{r}
+#tokenize text and remove stop words
+armeniatext <- armeniatext %>% unnest_tokens(word, text)
+data(stop_words)
+armeniatext <- armeniatext %>% anti_join(stop_words)
+
+```
+## Question 13: Figure out the top 5 most used word in the report 
+
+```{r}
+#count frequency of words
+hpfreq <- armeniatext %>% count(word, sort= TRUE)
+head(hpfreq)
+
+```
+## Question 14: Load the Billboard Hot 100 webpage, which we explored in the course modules. Namethe list object:hot100exam
+
+```{r}
+#load libraries
+library(rvest)
+library(dplyr)
+library(ggplot2)
+#load webpage
+hot100exam <- "https://www.billboard.com/charts/hot-100"
+hot100 <- read_html(hot100exam)
+
+```
+## Question : Use rvest to obtain identify all of the nodes in the webpage. 
+
+```{r}
+#declare full (enough) struture to r
+body_nodes <- hot100 %>% 
+  html_node('body') %>% 
+  html_children()
+body_nodes
+
+body_nodes %>% 
+  html_children()
+```
+## Question 16: Use Google Chrome developer to identify the necessary tags and pull the data onRank,Artist,Title, andLast Week. HINT 1: In class we showed you how to get the first threeof these. You simply need to add theLast Weekranking. HINT 2: You can navigatetwo ways. Hovering to find what you need or by doingCmd+F / Ctrl+Fand usingactual data to find the location. HINT 3: You’re looking to update the code based ontheway the information is in referenced. Try out some different options and see whatshows up in the environment. Keep trying until you see that you have achr [1:100]with values that correspond to what is in the web page.
+
+```{r}
+#pull out specific data form the webpage
+#rank, artists, title, Last week
+rank <- hot100 %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class,
+                     'chart-element__rank__number')]") %>% 
+  rvest::html_text()
+
+artist <- hot100 %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class,                     'chart-element__information__artist')]") %>%
+  rvest::html_text()
+
+title <- hot100 %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class,
+ 'chart-element__information__song')]") %>% 
+  rvest::html_text()
+
+ last_week <- hot100 %>% 
+  rvest::html_nodes('body') %>% 
+  xml2::xml_find_all("//span[contains(@class,
+ 'chart-element__meta text--center color--secondary text--last')]") %>% 
+  rvest::html_text()
+
+```
+## Question 17: Save all of the files (i.e..Rmd,.dta,.pdf/Word Doc), push them to your GitHub repo,and provide us with the link to that repo. 
